@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>光的折射・視差挑戰</title>
+<style>
+  :root{--ink:#4a3b2c;--wood:#7c5f3d;--paper:#fbf2dc}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;min-height:100vh;color:var(--ink);touch-action:manipulation;
+    background:#e6d6b4;
+    background-image:radial-gradient(circle at 15% 10%,#f6ecd2,transparent 55%),
+                     radial-gradient(circle at 85% 95%,#d6c094,transparent 50%);
+    font-family:"Kaiti TC","BiauKai","DFKai-SB","Noto Serif TC","PingFang TC","Microsoft JhengHei",serif;
+  }
+  #app{max-width:900px;margin:0 auto;padding:10px 10px 24px}
+  .panel{
+    background:var(--paper);border:3px solid var(--wood);
+    border-radius:14px 22px 16px 24px/22px 14px 24px 16px;
+    box-shadow:2px 3px 0 rgba(90,60,30,.25);padding:8px 14px;
+  }
+  .hud{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:bold}
+  .timer{flex:1;position:relative;height:26px;border:2px solid var(--wood);border-radius:13px;background:#efe2c2;overflow:hidden}
+  #tbar{height:100%;width:100%;background:#58b368;transition:width .12s linear,background .3s}
+  #ttxt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+  #bchip{min-width:58px;text-align:center;padding:2px 8px;border-radius:12px;border:2px solid var(--wood);background:#c8ecc9;font-size:15px}
+  .prompt{display:flex;align-items:center;gap:12px;margin-top:8px}
+  .prompt svg{flex:none}
+  #pText{font-size:24px;font-weight:bold;flex:1}
+  .chip{font-size:14px;padding:3px 10px;border:2px solid var(--wood);border-radius:12px;background:#e5f1f4;white-space:nowrap}
+  .board{position:relative;margin:8px 0;border:4px solid var(--wood);border-radius:10px 16px 12px 18px;overflow:hidden;
+         background:#f5ead3;box-shadow:3px 4px 0 rgba(90,60,30,.3)}
+  #scene{display:block;width:100%;height:auto;user-select:none}
+  .cand{cursor:pointer}
+  .cand .ci{transition:transform .15s}
+  .cand:hover .ci{transform:scale(1.2)}
+  .halo{animation:dash 2.5s linear infinite}
+  @keyframes dash{to{stroke-dashoffset:-22}}
+  .ray{stroke-dasharray:1 1;stroke-dashoffset:1;animation:draw 1.1s ease-out .1s forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .fade{opacity:0;animation:fin .6s ease 1s forwards}
+  @keyframes fin{to{opacity:1}}
+  .pulse{transform-box:fill-box;transform-origin:center;animation:pl 1.2s ease-in-out infinite}
+  @keyframes pl{50%{transform:scale(1.12)}}
+  .fb{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:78px}
+  .hint{font-size:20px;opacity:.8}
+  .fbt{font-size:22px;font-weight:bold}
+  .fbt.ok{color:#2e7d32}.fbt.wrong{color:#c0392b}.fbt.timeout{color:#b8741a}
+  .pts{background:#fff2b8;border:2px solid #d9a62a;border-radius:10px;padding:0 8px;margin-left:4px}
+  .bon{font-size:16px;color:#b8741a}
+  .fbs{font-size:16px;margin-top:4px;opacity:.85}
+  .btn{
+    font:inherit;font-weight:bold;font-size:18px;padding:8px 22px;cursor:pointer;white-space:nowrap;
+    border:3px solid #6b4f2f;border-radius:14px 20px 14px 22px;color:#4a2f12;
+    background:linear-gradient(#f7d77a,#e5ab3a);box-shadow:0 3px 0 #8a6a35;
+  }
+  .btn:active{transform:translateY(3px);box-shadow:none}
+  .ov{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(245,234,211,.35)}
+  .card{background:rgba(251,242,220,.97);border:3px solid var(--wood);padding:18px 26px;text-align:center;max-width:90%;
+        border-radius:16px 24px 18px 26px/24px 16px 26px 18px;box-shadow:3px 4px 0 rgba(90,60,30,.3)}
+  .card h1{margin:0 0 6px;font-size:30px}
+  .rules{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 16px;font-size:18px;text-align:left}
+  .rules div{background:#f1e3bf;border:2px dashed #b89a68;border-radius:10px;padding:4px 10px}
+  .big{font-size:56px;font-weight:bold;color:#c0392b;line-height:1.1}
+  .stars{font-size:34px;color:#e0a526;letter-spacing:4px}
+  .list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0}
+  .list div{width:50px;padding:3px 0;border-radius:8px;border:2px solid var(--wood);font-size:14px;line-height:1.25}
+  .list .ok{background:#cfeccf}.list .wrong{background:#f6cfc8}.list .timeout{background:#f3e0b0}
+  .hidden{display:none!important}
+  @media(max-width:560px){#pText{font-size:19px}.hud{font-size:15px;gap:8px}.card h1{font-size:24px}.big{font-size:44px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hud panel">
+    <div>第 <span id="qn">0</span>/10</div>
+    <div class="timer"><div id="tbar"></div><span id="ttxt">60 秒</span></div>
+    <div id="bchip">+20</div>
+    <div>⭐ <span id="sc">0</span></div>
+  </div>
+
+  <div class="prompt panel">
+    <svg id="pIcon" viewBox="0 0 80 80" width="54" height="54"></svg>
+    <div id="pText">準備好了嗎？</div>
+    <span class="chip" id="pMode">—</span>
+  </div>
+
+  <div class="board">
+    <svg id="scene" viewBox="0 0 800 520" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- 大面積水彩 -->
+        <filter id="wcB" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves="2" seed="5" result="warp"/>
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="14" xChannelSelector="R" yChannelSelector="G" result="d"/>
+          <feTurbulence type="fractalNoise" baseFrequency="0.035 0.05" numOctaves="4" seed="9" result="gr"/>
+          <feColorMatrix in="gr" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.3 0 0 0 0.2" result="mask"/>
+          <feGaussianBlur in="d" stdDeviation="2.2" result="b"/>
+          <feComposite in="d" in2="b" operator="arithmetic" k1="0" k2="1.45" k3="-0.5" k4="0" result="edge"/>
+          <feComposite in="edge" in2="mask" operator="in"/>
+        </filter>
+        <!-- 小物件水彩 -->
+        <filter id="wcS" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04 0.05" numOctaves="2" seed="3" result="warp"/>
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+          <feTurbulence type="fractalNoise" baseFrequency="0.09 0.12" numOctaves="3" seed="7" result="gr"/>
+          <feColorMatrix in="gr" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.1 0 0 0 0.3" result="mask"/>
+          <feGaussianBlur in="d" stdDeviation="1.2" result="b"/>
+          <feComposite in="d" in2="b" operator="arithmetic" k1="0" k2="1.4" k3="-0.4" k4="0" result="edge"/>
+          <feComposite in="edge" in2="mask" operator="in"/>
+        </filter>
+        <!-- 紙張紋理 -->
+        <filter id="paper" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="2"/>
+          <feColorMatrix type="matrix" values="0 0 0 0 0.45  0 0 0 0 0.36  0 0 0 0 0.24  1.3 0 0 0 -0.4"/>
+        </filter>
+        <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe3ee"/><stop offset="1" stop-color="#fdf1d2"/></linearGradient>
+        <linearGradient id="gWater" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a6e0ee"/><stop offset=".5" stop-color="#5eb1cf"/><stop offset="1" stop-color="#2f7898"/></linearGradient>
+        <linearGradient id="gGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c29c68"/><stop offset="1" stop-color="#8a6a43"/></linearGradient>
+        <linearGradient id="gSand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ecd9a6"/><stop offset="1" stop-color="#c9ae76"/></linearGradient>
+        <linearGradient id="gShaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      </defs>
+      <g id="Lbg"></g>
+      <g id="Lpath"></g>
+      <g id="Lthings"></g>
+      <g id="Lcands"></g>
+      <g id="Lfb"></g>
+      <rect x="0" y="0" width="800" height="520" fill="#000" filter="url(#paper)" opacity=".4" style="mix-blend-mode:multiply;pointer-events:none"/>
+    </svg>
+
+    <div id="start" class="ov">
+      <div class="card">
+        <h1>🔦 光的折射・視差挑戰</h1>
+        <div>找出虛像與實物的位置！</div>
+        <div class="rules">
+          <div>🎯 共 10 題</div>
+          <div>⏱ 每題 60 秒</div>
+          <div>✅ 答對 +50</div>
+          <div>⚡ 30 秒內 +10</div>
+          <div>⚡⚡ 10 秒內 +20</div>
+          <div>👆 點選位置</div>
+        </div>
+        <button class="btn" id="startBtn">開始挑戰</button>
+      </div>
+    </div>
+
+    <div id="result" class="ov hidden">
+      <div class="card">
+        <h1>挑戰結束</h1>
+        <div class="big"><span id="rScore">0</span><span style="font-size:22px"> / 700</span></div>
+        <div class="stars" id="rStars"></div>
+        <div id="rRank" style="font-size:22px;font-weight:bold"></div>
+        <div class="list" id="rList"></div>
+        <div id="rBest" style="font-size:16px;opacity:.8;margin-bottom:10px"></div>
+        <button class="btn" id="againBtn">再玩一次</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fb panel" id="fb"><span class="hint">按「開始挑戰」</span></div>
+</div>
+
+<script>
+/* ============ 常數 ============ */
+const Y0 = 270;            // 水面 y
+const NW = 1.33, NA = 1.0; // 折射率
+const TOTAL = 10, LIMIT = 60;
+const $ = id => document.getElementById(id);
+const rand = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ============ 物件圖示（水彩手繪） ============ */
+const INK = '#4a3b2c';
+const wrapIcon = inner => `<g stroke="${INK}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">${inner}</g>`;
+const starPts = (()=>{let p=[];for(let i=0;i<10;i++){const r=i%2?12:29,a=-Math.PI/2+i*Math.PI/5;p.push((Math.cos(a)*r).toFixed(1)+','+(Math.sin(a)*r).toFixed(1));}return p.join(' ');})();
+const starDots = [0,1,2,3,4].map(i=>{const a=-Math.PI/2+i*2*Math.PI/5;return `<circle cx="${(Math.cos(a)*17).toFixed(1)}" cy="${(Math.sin(a)*17).toFixed(1)}" r="2.2" fill="#fbd0b6" stroke="none"/>`}).join('');
+
+const ICONS = {
+  fish:{name:'金魚',svg:wrapIcon(`
+    <path d="M22,0 L42,-17 C37,-5 37,5 42,17Z" fill="#f7b267"/>
+    <path d="M-26,0 C-14,-21 14,-21 24,0 C14,21 -14,21 -26,0Z" fill="#f28c38"/>
+    <path d="M-6,-15 C0,-31 14,-27 15,-13Z" fill="#ee6f2b"/>
+    <path d="M-4,14 C0,24 8,24 10,13Z" fill="#ee6f2b"/>
+    <path d="M2,-8 Q8,0 2,8 M10,-8 Q16,0 10,8" fill="none" stroke="#c9531a" stroke-width="1.4"/>
+    <path d="M-18,-12 Q-8,-16 0,-12" fill="none" stroke="#ffe0b0" stroke-width="2.4"/>
+    <circle cx="-15" cy="-4" r="3.6" fill="#fff" stroke-width="1.2"/><circle cx="-16" cy="-4" r="1.7" fill="#222" stroke="none"/>
+    <path d="M-24,3 Q-21,5 -19,3" fill="none" stroke-width="1.3"/>`)},
+  coin:{name:'金幣',svg:wrapIcon(`
+    <path fill-rule="evenodd" d="M-23,0 a23,23 0 1,0 46,0 a23,23 0 1,0 -46,0Z M-6,-6 h12 v12 h-12Z" fill="#f2c94c"/>
+    <circle r="17" fill="none" stroke="#c99a1f" stroke-width="1.6"/>
+    <path d="M-16,-10 Q-10,-18 0,-19" fill="none" stroke="#fff3b8" stroke-width="2.5"/>
+    <path d="M-6,-6h12v12h-12z" fill="none" stroke="#a4781a" stroke-width="1.5"/>`)},
+  star:{name:'海星',svg:wrapIcon(`<polygon points="${starPts}" fill="#e9605a"/>${starDots}`)},
+  gem:{name:'寶石',svg:wrapIcon(`
+    <path d="M-25,-8 L-13,-24 L13,-24 L25,-8 L0,26Z" fill="#59c3d9"/>
+    <path d="M-7,-8 L7,-8 L0,26Z" fill="#8fe3ee" stroke="none"/>
+    <path d="M-25,-8 H25 M-13,-24 L-7,-8 L0,26 M13,-24 L7,-8 L0,26" fill="none" stroke-width="1.4"/>
+    <path d="M-17,-19 L-12,-12" stroke="#fff" stroke-width="3" fill="none"/>`)},
+  shell:{name:'貝殼',svg:wrapIcon(`
+    <path d="M0,22 L-27,-2 C-30,-24 -8,-30 0,-30 C8,-30 30,-24 27,-2Z" fill="#f4b9a3"/>
+    <path d="M0,22 L-17,-25 M0,22 L-6,-29 M0,22 L6,-29 M0,22 L17,-25" fill="none" stroke="#c8765f" stroke-width="1.6"/>
+    <path d="M-9,22 L9,22 L6,28 L-6,28Z" fill="#e69c82"/>`)},
+  bird:{name:'海鷗',svg:wrapIcon(`
+    <path d="M14,2 L32,-3 L30,9Z" fill="#d6dde6"/>
+    <ellipse cx="2" cy="4" rx="18" ry="10" fill="#f4f1ea"/>
+    <circle cx="-17" cy="-3" r="8" fill="#f4f1ea"/>
+    <path d="M-24,-4 L-35,0 L-24,2Z" fill="#f2a33a"/>
+    <circle cx="-19" cy="-5" r="1.8" fill="#222" stroke="none"/>
+    <path d="M-8,2 C-2,-26 20,-30 32,-20 C20,-16 12,-6 6,10Z" fill="#b9c7da"/>`)},
+  balloon:{name:'氣球',svg:wrapIcon(`
+    <path d="M0,28 C-6,36 6,40 0,50" fill="none" stroke-width="1.5"/>
+    <path d="M-21,-8 C-21,-34 21,-34 21,-8 C21,10 6,20 0,22 C-6,20 -21,10 -21,-8Z" fill="#e8574a"/>
+    <path d="M-4,22 L4,22 L0,28Z" fill="#c43e33"/>
+    <ellipse cx="-9" cy="-14" rx="4" ry="8" fill="#fff" opacity=".6" stroke="none" transform="rotate(20 -9 -14)"/>`)},
+  butterfly:{name:'蝴蝶',svg:wrapIcon(`
+    <path d="M0,0 C-10,-26 -34,-26 -30,-6 C-28,6 -10,6 0,0Z" fill="#9b6fd0"/>
+    <path d="M0,0 C10,-26 34,-26 30,-6 C28,6 10,6 0,0Z" fill="#9b6fd0"/>
+    <path d="M0,2 C-8,4 -24,6 -20,22 C-14,28 -4,16 0,2Z" fill="#e58fc2"/>
+    <path d="M0,2 C8,4 24,6 20,22 C14,28 4,16 0,2Z" fill="#e58fc2"/>
+    <circle cx="-19" cy="-12" r="4" fill="#ffe9a8" stroke="none"/><circle cx="19" cy="-12" r="4" fill="#ffe9a8" stroke="none"/>
+    <ellipse cx="0" cy="4" rx="3" ry="16" fill="${INK}"/>
+    <path d="M-1,-12 Q-8,-24 -12,-22 M1,-12 Q8,-24 12,-22" fill="none"/>`)}
+};
+const WATER = ['fish','coin','star','gem','shell'];
+const AIR = ['bird','balloon','butterfly'];
+
+const solidI = k => `<g filter="url(#wcS)">${ICONS[k].svg}</g>`;
+const ghostI = k => `<g opacity=".6" filter="url(#wcS)">${ICONS[k].svg}</g>
+  <circle class="halo" r="37" fill="rgba(255,255,255,.2)" stroke="#2c6f9b" stroke-width="2.2" stroke-dasharray="7 5"/>`;
+const at = (p,inner) => `<g transform="translate(${p.x},${p.y})">${inner}</g>`;
+function tag(p,text,col){
+  const left=p.x>670,w=46,x=left?p.x-42-w:p.x+42;
+  return `<g><rect x="${x}" y="${p.y-12}" width="${w}" height="24" rx="8" fill="#fff7e0" stroke="${col}" stroke-width="2"/>
+  <text x="${x+w/2}" y="${p.y+5}" text-anchor="middle" font-size="15" font-weight="bold" fill="${col}">${text}</text></g>`;
+}
+
+/* ============ 視者 ============ */
+function personShore(ex,ey){
+  return `<g transform="translate(${ex-9},${ey+1})" filter="url(#wcS)" stroke="${INK}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-13,96 L-13,121 M9,96 L9,121" stroke-width="9" stroke="#f0c39a" fill="none"/>
+    <ellipse cx="-11" cy="124" rx="12" ry="4.5" fill="#8a5a33"/><ellipse cx="13" cy="124" rx="12" ry="4.5" fill="#8a5a33"/>
+    <path d="M-22,22 C-8,18 6,18 18,22 L26,100 C0,106 -20,106 -30,100Z" fill="#fbf3df"/>
+    <path d="M-25,52 C-6,60 10,60 22,52" fill="none" stroke="#3b79a6" stroke-width="5"/>
+    <path d="M12,28 C28,34 40,44 52,44" fill="none" stroke="#f0c39a" stroke-width="9"/>
+    <rect x="-7" y="12" width="12" height="12" fill="#f0c39a" stroke="none"/>
+    <circle cx="-2" cy="-2" r="18" fill="#f6cfa4"/>
+    <path d="M-20,0 C-24,-24 8,-30 18,-8 C8,-14 -6,-12 -10,0 C-12,6 -16,8 -20,0Z" fill="#5a3b2a"/>
+    <ellipse cx="9" cy="-1" rx="4.6" ry="3.7" fill="#fff" stroke-width="1.2"/><circle cx="10.4" cy="-1" r="2.1" fill="#2b2118" stroke="none"/>
+    <path d="M5,-7 Q10,-10 14,-7" fill="none" stroke-width="1.5"/>
+    <path d="M15,3 L19,6 L15,7" fill="none" stroke-width="1.3"/>
+    <path d="M8,10 Q12,12 15,9" fill="none" stroke-width="1.3"/>
+  </g>`;
+}
+function diver(ex,ey){
+  return `<g transform="translate(${ex-10},${ey})" filter="url(#wcS)" stroke="${INK}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-8,-14 C-14,-40 -14,-80 -12,-118" fill="none" stroke="#e8743b" stroke-width="5"/>
+    <path d="M-10,84 L-16,116 M8,84 L14,114" stroke="#2f4f7a" stroke-width="9" fill="none"/>
+    <path d="M-16,114 L-40,132 L-10,128Z" fill="#e8b33b"/><path d="M14,112 L38,130 L8,126Z" fill="#e8b33b"/>
+    <path d="M-20,22 C-6,18 8,18 20,22 L22,84 C0,90 -16,90 -24,84Z" fill="#2f4f7a"/>
+    <path d="M-18,30 C-34,48 -30,64 -22,72" fill="none" stroke="#2f4f7a" stroke-width="9"/>
+    <path d="M16,30 C34,44 40,54 46,64" fill="none" stroke="#2f4f7a" stroke-width="9"/>
+    <rect x="-6" y="12" width="12" height="12" fill="#f0c39a" stroke="none"/>
+    <circle cx="0" cy="0" r="17" fill="#f6cfa4"/>
+    <path d="M-17,-2 C-18,-22 14,-26 17,-4 Z" fill="#2f4f7a"/>
+    <rect x="-1" y="-9" width="27" height="18" rx="7" fill="rgba(170,230,245,.75)" stroke-width="2.4"/>
+    <ellipse cx="10" cy="0" rx="4.6" ry="3.7" fill="#fff" stroke-width="1.1"/><circle cx="11.3" cy="0" r="2.1" fill="#2b2118" stroke="none"/>
+    <path d="M-17,-1 L-1,-1" fill="none" stroke-width="3"/>
+    <circle cx="20" cy="-30" r="3.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="26" cy="-46" r="2.5" fill="none" stroke="#fff" stroke-width="1.5"/>
+  </g>`;
+}
+
+/* ============ 背景（依場景快取） ============ */
+const bgCache = {};
+function wavePath(y,amp,len,x0,x1){let d=`M${x0},${y}`;d+=` q${len/4},${-amp} ${len/2},0`;for(let x=x0+len/2;x<x1;x+=len/2)d+=` t${len/2},0`;return d;}
+function buildBG(mode){
+  if(bgCache[mode]) return bgCache[mode];
+  const r = rng(mode==='shore'?11:23), fl = Y0+218;
+  let s='';
+  // 天空、遠山、神殿、雲
+  s+=`<g filter="url(#wcB)"><rect x="-30" y="-30" width="860" height="${Y0+30}" fill="url(#gSky)"/></g>`;
+  s+=`<g filter="url(#wcB)" opacity=".85">
+        <path d="M-30,${Y0} L-30,175 C60,125 130,150 210,168 C290,120 380,92 470,140 C560,182 640,132 720,152 C770,162 800,150 830,140 L830,${Y0}Z" fill="#a9cfae"/>
+        <path d="M300,${Y0} C380,196 470,190 560,${Y0}Z" fill="#8fbf9f"/></g>`;
+  s+=`<g filter="url(#wcS)" opacity=".55" stroke="#b9a584" stroke-width="1.5">
+        <path d="M655,128 L735,128 L695,106Z" fill="#efe3c6"/><rect x="658" y="128" width="74" height="6" fill="#e6d7b5"/>
+        ${[664,678,692,706,720].map(x=>`<rect x="${x}" y="134" width="7" height="22" fill="#f4ead2"/>`).join('')}
+        <rect x="656" y="156" width="78" height="6" fill="#e6d7b5"/></g>`;
+  const cl=(x,y,k)=>`<g transform="translate(${x},${y}) scale(${k})"><ellipse rx="40" ry="14"/><ellipse cx="-22" cy="-8" rx="22" ry="14"/><ellipse cx="14" cy="-12" rx="26" ry="16"/></g>`;
+  s+=`<g filter="url(#wcS)" fill="#fff" opacity=".85">${cl(170,50,1)}${cl(440,38,.8)}${cl(640,58,1.1)}</g>`;
+  // 水
+  s+=`<g filter="url(#wcB)"><rect x="-30" y="${Y0}" width="860" height="${560-Y0}" fill="url(#gWater)"/></g>`;
+  for(let i=0;i<4;i++){const x=240+i*170+r()*40;
+    s+=`<polygon points="${x},${Y0} ${x+45},${Y0} ${x+150},500 ${x+70},500" fill="url(#gShaft)"/>`;}
+  s+=`<g filter="url(#wcS)" fill="none" stroke-linecap="round">
+        <path d="${wavePath(Y0,4,50,-20,830)}" stroke="#fff" stroke-width="3.5" opacity=".85"/>
+        <path d="${wavePath(Y0+14,3,60,-10,830)}" stroke="#fff" stroke-width="2" opacity=".4"/>
+        <path d="${wavePath(Y0+34,3,70,10,830)}" stroke="#fff" stroke-width="1.6" opacity=".25"/></g>`;
+  // 地面與水底
+  if(mode==='shore'){
+    s+=`<g filter="url(#wcB)"><path d="M-30,${Y0} L176,${Y0} C190,${Y0+30} 200,${Y0+110} 245,${Y0+170} C275,${Y0+210} 300,${Y0+222} 360,${Y0+224} L830,${Y0+222} L830,560 L-30,560Z" fill="url(#gGround)"/></g>`;
+    s+=`<g filter="url(#wcS)"><path d="M-30,${Y0-6} L178,${Y0-6} C184,${Y0+4} 186,${Y0+10} 188,${Y0+16} L-30,${Y0+16}Z" fill="#78b061"/>
+        ${[20,60,98,140,166].map(x=>`<path d="M${x},${Y0-4} l-3,-12 M${x+4},${Y0-4} l2,-14 M${x+8},${Y0-4} l6,-10" stroke="#5b9a4a" stroke-width="2.2" fill="none" stroke-linecap="round"/>`).join('')}</g>`;
+    s+=`<g filter="url(#wcS)" stroke="${INK}" stroke-width="1.6">
+        <path d="M26,${Y0-6} C24,${Y0-50} 32,${Y0-92} 28,${Y0-124} L42,${Y0-124} C40,${Y0-92} 46,${Y0-50} 44,${Y0-6}Z" fill="#8b6a45"/>
+        <ellipse cx="34" cy="${Y0-150}" rx="46" ry="26" fill="#8aa86a"/><ellipse cx="14" cy="${Y0-134}" rx="30" ry="18" fill="#9bb87a"/><ellipse cx="58" cy="${Y0-136}" rx="30" ry="18" fill="#7f9c60"/></g>`;
+  }else{
+    s+=`<g filter="url(#wcB)"><path d="M-30,${Y0+215} C150,${Y0+205} 330,${Y0+228} 520,${Y0+220} C660,${Y0+212} 760,${Y0+224} 830,${Y0+216} L830,560 L-30,560Z" fill="url(#gSand)"/></g>`;
+  }
+  // 水草、石頭、氣泡
+  const weed=(x,h,c)=>`<path d="M${x},${fl+4} C${x-16},${fl-h*.35} ${x+16},${fl-h*.65} ${x},${fl-h}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/>`;
+  s+=`<g filter="url(#wcS)">${[430,575,700,330,120].filter(x=>mode==='diver'||x>300).map(x=>weed(x,45+r()*45,pick2(r,['#3f9a6a','#58b27a','#2f8560']))).join('')}
+      ${Array.from({length:8},()=>{const x=(mode==='shore'?280:-10)+r()*(mode==='shore'?520:820);return `<ellipse cx="${x}" cy="${fl+8+r()*6}" rx="${8+r()*10}" ry="${5+r()*4}" fill="${pick2(r,['#b9b2a5','#a39c90','#c9c2b3'])}" stroke="${INK}" stroke-width="1.3"/>`}).join('')}</g>`;
+  s+=`<g fill="none" stroke="#fff" stroke-width="1.6" opacity=".6">${Array.from({length:7},()=>`<circle cx="${280+r()*500}" cy="${Y0+40+r()*300*0.6}" r="${2+r()*4}"/>`).join('')}</g>`;
+  // 視者
+  s+= mode==='shore' ? personShore(112,Y0-124) : diver(235,Y0+90);
+  return bgCache[mode]=s;
+}
+function pick2(r,a){return a[Math.floor(r()*a.length)]}
+
+/* ============ 物理：求折射點與虛像 ============ */
+function solve(obj,eye,nO,nE){
+  const dO=Math.abs(obj.y-Y0), dE=Math.abs(eye.y-Y0);
+  let a=obj.x,b=eye.x;
+  for(let i=0;i<60;i++){
+    const m=(a+b)/2;
+    const so=Math.abs(m-obj.x)/Math.hypot(m-obj.x,dO);
+    const se=Math.abs(eye.x-m)/Math.hypot(eye.x-m,dE);
+    if(nO*so-nE*se<0) a=m; else b=m;
+  }
+  const xs=(a+b)/2;
+  const t=(obj.x-eye.x)/(xs-eye.x);
+  return {xs, img:{x:obj.x,y:eye.y+t*(Y0-eye.y)}};
+}
+
+/* ============ 出題 ============ */
+function makeCands(q){
+  const T=q.ask==='image'?q.img:q.obj, F=q.ask==='image'?q.obj:q.img;
+  const s=q.mode==='shore'?1:-1, R=q.region;
+  const dT=Math.abs(T.y-Y0), dF=Math.abs(F.y-Y0), dObj=Math.abs(q.obj.y-Y0);
+  const far=Math.max(dT,dF), near=Math.min(dT,dF);
+  const Yd=Y0+s*dObj, k=(Yd-Y0)/(Y0-q.eye.y);
+  const Qp={x:q.xs+(q.xs-q.eye.x)*k,y:Yd};          // 「光沿視線直走」的迷思位置
+  const sh=T.x<(R.x0+R.x1)/2?1:-1;
+  const pool=shuffle([
+    {x:T.x,y:Y0+s*far*1.4},{x:T.x,y:Y0+s*near*0.55},Qp,{x:T.x,y:Y0+s*(dT+dF)/2},
+    {x:T.x+sh*105,y:T.y},{x:T.x+sh*105,y:Y0+s*far*1.25},{x:T.x-sh*105,y:Y0+s*near*0.7}
+  ]);
+  const ok=(p,list)=>p.x>=R.x0&&p.x<=R.x1&&p.y>=R.y0&&p.y<=R.y1&&list.every(o=>Math.hypot(p.x-o.x,p.y-o.y)>=66);
+  const picks=[];
+  for(const p of pool){ if(picks.length>=3)break; if(ok(p,[T,F,...picks])) picks.push(p); }
+  for(let i=0;i<300&&picks.length<3;i++){
+    const p={x:rand(R.x0,R.x1),y:rand(R.y0,R.y1)}; if(ok(p,[T,F,...picks])) picks.push(p);
+  }
+  if(picks.length<3) return false;
+  const all=[{...T,correct:true},...picks.map(p=>({...p,correct:false}))].sort((a,b)=>a.x-b.x||a.y-b.y);
+  q.cands=all; return true;
+}
+function genQuestion(){
+  for(let tr=0;tr<1000;tr++){
+    const mode=Math.random()<0.6?'shore':'diver', ask=Math.random()<0.5?'image':'object';
+    let q;
+    if(mode==='shore'){
+      q={mode,ask,key:pick(WATER),obj:{x:rand(400,700),y:Y0+rand(70,185)},eye:{x:112,y:Y0-124},nO:NW,nE:NA,
+         region:{x0:380,x1:745,y0:Y0+32,y1:458}};
+    }else{
+      q={mode,ask,key:pick(AIR),obj:{x:rand(340,700),y:Y0-rand(50,115)},eye:{x:235,y:Y0+90},nO:NA,nE:NW,
+         region:{x0:320,x1:750,y0:96,y1:Y0-34}};
+    }
+    const r=solve(q.obj,q.eye,q.nO,q.nE); q.xs=r.xs; q.img=r.img;
+    const dO=Math.abs(q.obj.y-Y0), dI=Math.abs(q.img.y-Y0);
+    if(mode==='shore'&&(dI<30||dO-dI<45)) continue;
+    if(mode==='diver'&&(q.img.y<100||dI-dO<45)) continue;
+    if(!makeCands(q)) continue;
+    return q;
+  }
+}
+
+/* ============ 繪製 ============ */
+function renderQuestion(q){
+  $('Lbg').innerHTML=buildBG(q.mode);
+  $('Lpath').innerHTML=''; $('Lfb').innerHTML='';
+  $('Lthings').innerHTML = q.ask==='image'
+    ? at(q.obj,solidI(q.key))+tag(q.obj,'實物','#9a5b1c')
+    : at(q.img,ghostI(q.key))+tag(q.img,'虛像','#2c6f9b');
+  $('Lcands').innerHTML=q.cands.map((c,i)=>`
+    <g class="cand" data-i="${i}" transform="translate(${c.x},${c.y})">
+      <g class="ci">${q.ask==='image'?ghostI(q.key):solidI(q.key)}</g>
+      <circle r="40" fill="rgba(0,0,0,0)"/>
+      <g transform="translate(27,27)"><circle r="11" fill="#fff7e0" stroke="${INK}" stroke-width="2"/>
+      <text y="5" text-anchor="middle" font-size="14" font-weight="bold" fill="${INK}">${i+1}</text></g>
+    </g>`).join('');
+}
+function arrow(x1,y1,x2,y2,t){
+  const x=x1+(x2-x1)*t,y=y1+(y2-y1)*t,a=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+  return `<polygon class="fade" points="8,0 -7,-6.5 -7,6.5" transform="translate(${x},${y}) rotate(${a})" fill="#f08a00" stroke="#7a4300" stroke-width="1.2"/>`;
+}
+function renderReveal(q,chosen,demo){
+  const {obj,img,eye,xs}=q;
+  if(demo) $('Lbg').innerHTML=buildBG(q.mode);
+  let p='';
+  p+=`<line x1="${xs}" y1="${Y0-42}" x2="${xs}" y2="${Y0+42}" stroke="#4d6178" stroke-width="1.7" stroke-dasharray="5 4" opacity=".8"/>`;
+  p+=`<line x1="${obj.x}" y1="${obj.y}" x2="${img.x}" y2="${img.y}" stroke="#6b5a45" stroke-width="1.7" stroke-dasharray="2 6" stroke-linecap="round"/>`;
+  p+=`<line class="fade" x1="${xs}" y1="${Y0}" x2="${img.x}" y2="${img.y}" stroke="#2c6f9b" stroke-width="2.6" stroke-dasharray="9 6"/>`;
+  const d=`M${obj.x},${obj.y} L${xs},${Y0} L${eye.x},${eye.y}`;
+  p+=`<path class="ray" pathLength="1" d="${d}" fill="none" stroke="#ffd24d" stroke-width="10" opacity=".45" stroke-linejoin="round"/>`;
+  p+=`<path class="ray" pathLength="1" d="${d}" fill="none" stroke="#f08a00" stroke-width="3.4" stroke-linejoin="round"/>`;
+  p+=arrow(obj.x,obj.y,xs,Y0,.55)+arrow(xs,Y0,eye.x,eye.y,.5);
+  $('Lpath').innerHTML=p;
+  $('Lthings').innerHTML=at(obj,solidI(q.key))+tag(obj,'實物','#9a5b1c')+at(img,ghostI(q.key))+tag(img,'虛像','#2c6f9b');
+  $('Lcands').innerHTML='';
+  let f='';
+  if(!demo){
+    const T=q.ask==='image'?img:obj;
+    if(chosen!==null&&!q.cands[chosen].correct){
+      const c=q.cands[chosen];
+      f+=`<g opacity=".5" transform="translate(${c.x},${c.y})">${q.ask==='image'?ghostI(q.key):solidI(q.key)}</g>
+          <circle cx="${c.x}" cy="${c.y}" r="42" fill="none" stroke="#c0392b" stroke-width="4"/>
+          <g transform="translate(${c.x+29},${c.y-29})"><circle r="12" fill="#c0392b"/><text y="5" text-anchor="middle" font-size="15" fill="#fff" font-weight="bold">✘</text></g>`;
+    }
+    f+=`<circle class="pulse" cx="${T.x}" cy="${T.y}" r="42" fill="none" stroke="#3f9a55" stroke-width="4.5"/>
+        <g transform="translate(${T.x+29},${T.y-29})"><circle r="12" fill="#3f9a55"/><text y="5" text-anchor="middle" font-size="15" fill="#fff" font-weight="bold">✔</text></g>`;
+  }
+  $('Lfb').innerHTML=f;
+}
+
+/* ============ 遊戲流程 ============ */
+const S={idx:0,score:0,results:[],q:null,t0:0,timer:null,answered:true,best:0};
+try{S.best=+localStorage.getItem('refrBest')||0}catch(e){}
+
+function setPrompt(q){
+  $('pIcon').innerHTML=`<g transform="translate(40,40) scale(1.05)" filter="url(#wcS)">${ICONS[q.key].svg}</g>`;
+  $('pText').textContent=q.ask==='image'?`${ICONS[q.key].name}的虛像在哪？`:`${ICONS[q.key].name}真正在哪？`;
+  $('pMode').textContent=q.mode==='shore'?'👁 岸上看水中':'🤿 水中看空中';
+}
+function tick(){
+  const el=(Date.now()-S.t0)/1000;
+  if(el>=LIMIT){answer(null);return;}
+  const left=LIMIT-el;
+  $('tbar').style.width=(left/LIMIT*100)+'%';
+  $('ttxt').textContent=Math.ceil(left)+' 秒';
+  const z=el<=10?20:el<=30?10:0, chip=$('bchip');
+  chip.textContent='+'+z;
+  chip.style.background=z===20?'#c8ecc9':z===10?'#f6e7a6':'#e9d3c4';
+  $('tbar').style.background=z===20?'#58b368':z===10?'#e6b93a':'#d9674a';
+}
+function nextQ(){
+  if(S.idx>=TOTAL){showResult();return;}
+  S.idx++; S.q=genQuestion(); S.answered=false;
+  $('qn').textContent=S.idx;
+  setPrompt(S.q); renderQuestion(S.q);
+  $('fb').innerHTML='<span class="hint">👆 點選圖中的位置（或按 1～4）</span>';
+  S.t0=Date.now(); tick(); clearInterval(S.timer); S.timer=setInterval(tick,100);
+}
+function answer(ci){
+  if(S.answered)return; S.answered=true; clearInterval(S.timer);
+  const q=S.q, el=ci===null?LIMIT:(Date.now()-S.t0)/1000;
+  let status='wrong',pts=0,bonus=0;
+  if(ci===null) status='timeout';
+  else if(q.cands[ci].correct){status='ok';pts=50;bonus=el<=10?20:el<=30?10:0;}
+  S.score+=pts+bonus; S.results.push({status,pts,bonus});
+  $('sc').textContent=S.score;
+  renderReveal(q,ci);
+  const msg={ok:'✅ 答對！',wrong:'❌ 答錯了',timeout:'⌛ 時間到'}[status];
+  $('fb').innerHTML=`<div>
+      <div class="fbt ${status}">${msg}<span class="pts">+${pts+bonus}</span>${bonus?`<span class="bon">⚡ 快速 +${bonus}</span>`:''}</div>
+      <div class="fbs">${q.mode==='shore'?'光離水偏折 → 虛像比實物淺':'光入水偏折 → 虛像比實物高'}${status==='ok'?`・${el.toFixed(1)} 秒`:''}</div>
+    </div><button class="btn" id="nextBtn">${S.idx>=TOTAL?'看成績 🏆':'下一題 ▶'}</button>`;
+  $('nextBtn').onclick=nextQ;
+}
+function showResult(){
+  const sc=S.score;
+  const [stars,rank]=sc>=600?[3,'光學大師！']:sc>=450?[2,'折射高手！']:sc>=300?[1,'漸入佳境']:[0,'再接再厲'];
+  if(sc>S.best){S.best=sc;try{localStorage.setItem('refrBest',sc)}catch(e){}}
+  $('rScore').textContent=sc;
+  $('rStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  $('rRank').textContent=rank;
+  $('rList').innerHTML=S.results.map((r,i)=>`<div class="${r.status}">${i+1}<br>${r.status==='ok'?'✔'+(r.pts+r.bonus):r.status==='wrong'?'✘':'⌛'}</div>`).join('');
+  $('rBest').textContent='最佳紀錄：'+S.best+' 分';
+  $('fb').innerHTML='<span class="hint">🎉 10 題全部完成！</span>';
+  $('result').classList.remove('hidden');
+}
+function startGame(){
+  S.idx=0;S.score=0;S.results=[];
+  $('sc').textContent=0;
+  $('start').classList.add('hidden'); $('result').classList.add('hidden');
+  nextQ();
+}
+
+/* 互動 */
+$('startBtn').onclick=startGame;
+$('againBtn').onclick=startGame;
+$('scene').addEventListener('click',e=>{
+  const g=e.target.closest('.cand'); if(g&&!S.answered) answer(+g.dataset.i);
+});
+document.addEventListener('keydown',e=>{
+  if(!S.answered){const n=+e.key;if(n>=1&&n<=4)answer(n-1);}
+  else if(e.key==='Enter'){const b=$('nextBtn');if(b&&!$('start').offsetParent&&$('result').classList.contains('hidden'))b.click();}
+});
+
+/* 開場示範圖 */
+(function demo(){
+  const q={mode:'shore',ask:'image',key:'fish',obj:{x:520,y:Y0+150},eye:{x:112,y:Y0-124},nO:NW,nE:NA};
+  const r=solve(q.obj,q.eye,q.nO,q.nE); q.xs=r.xs; q.img=r.img;
+  setPrompt(q); $('pText').textContent='光的折射・視差'; $('pMode').textContent='👁 岸上看水中';
+  renderReveal(q,null,true);
+})();
+</script>
+</body>
+</html>
